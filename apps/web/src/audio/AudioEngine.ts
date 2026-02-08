@@ -84,12 +84,15 @@ export class MotorAudio {
     }
 
     try {
-      // Detener reproducción actual si existe
+      // Detener reproducción actual completamente antes de cargar nueva pista
       this.detenerFuente();
+      this._reproduciendo = false;
+      this._offset = 0;
+      this._tiempoInicio = 0;
+      this.detenerActualizacionTiempo();
 
       // Decodificar el audio
       this.bufferActual = await this.contexto!.decodeAudioData(arrayBuffer.slice(0));
-      this._offset = 0;
 
       this.emitir('cargado', {
         duracion: this.bufferActual.duration,
@@ -109,13 +112,26 @@ export class MotorAudio {
   reproducir(): void {
     if (!this.contexto || !this.bufferActual || !this.preampNodo) return;
 
-    // Reanudar contexto si está suspendido
-    if (this.contexto.state === 'suspended') {
-      this.contexto.resume();
-    }
-
     // Si ya está reproduciendo, no hacer nada
     if (this._reproduciendo) return;
+
+    // Reanudar contexto si está suspendido y esperar a que esté listo
+    if (this.contexto.state === 'suspended') {
+      this.contexto.resume().then(() => {
+        // Verificar de nuevo tras la reactivación asíncrona
+        if (!this._reproduciendo && this.bufferActual) {
+          this.iniciarReproduccionInterna();
+        }
+      });
+      return;
+    }
+
+    this.iniciarReproduccionInterna();
+  }
+
+  /** Lógica interna para iniciar la reproducción una vez el contexto está activo */
+  private iniciarReproduccionInterna(): void {
+    if (!this.contexto || !this.bufferActual || !this.preampNodo) return;
 
     this.crearFuente();
     this.fuente!.start(0, this._offset);

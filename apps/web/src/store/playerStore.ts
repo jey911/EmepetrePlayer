@@ -95,6 +95,7 @@ export const usePlayerStore = create<EstadoPlayer>((set, get) => ({
       // Limpiar todos los listeners previos antes de registrar nuevos
       motor.offAll('finalizado');
       motor.offAll('tiempoActualizado');
+      motor.offAll('estadoCambiado');
 
       set({
         pistaActual: pista,
@@ -122,9 +123,14 @@ export const usePlayerStore = create<EstadoPlayer>((set, get) => ({
         set({ tiempoActual: d.tiempoActual, duracion: d.duracion });
       });
 
+      // Sincronizar estado de reproducción con el motor (cubre el caso async de resume)
+      motor.on('estadoCambiado', (datos: unknown) => {
+        const d = datos as { reproduciendo: boolean };
+        set({ reproduciendo: d.reproduciendo });
+      });
+
       // Iniciar reproducción desde el principio
       motor.reproducir();
-      set({ reproduciendo: true });
 
       // Registrar en historial e incrementar reproducciones
       await incrementarReproducciones(pista.id);
