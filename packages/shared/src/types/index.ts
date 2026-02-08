@@ -36,6 +36,10 @@ export interface Pista {
   reproduciones: number;
   favorito: boolean;
   nombreArchivo: string;
+  /** Ruta de la carpeta relativa a la carpeta raíz escaneada */
+  carpeta?: string;
+  /** Nombre de la carpeta raíz escaneada */
+  carpetaRaiz?: string;
 }
 
 /** Datos del archivo de audio almacenado */
@@ -165,4 +169,14 @@ export interface FiltrosBusqueda {
   favoritos?: boolean;
   anioDesde?: number;
   anioHasta?: number;
+  carpeta?: string;
+  carpetaRaiz?: string;
+}
+
+/** Nodo de carpeta para la vista de árbol */
+export interface NodoCarpeta {
+  nombre: string;
+  ruta: string;
+  subcarpetas: NodoCarpeta[];
+  cantidadPistas: number;
 }

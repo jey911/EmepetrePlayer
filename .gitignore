@@ -8,6 +8,16 @@ dist/
 build/
 *.tsbuildinfo
 
+# TypeScript build output (emitted by tsc -b alongside source files)
+apps/web/src/**/*.js
+apps/web/src/**/*.js.map
+apps/web/src/**/*.d.ts
+!apps/web/src/types/*.d.ts
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
+packages/shared/src/**/*.js
+packages/shared/src/**/*.js.map
+
 # Testing
 coverage/
 

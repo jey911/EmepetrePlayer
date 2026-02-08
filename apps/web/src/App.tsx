@@ -28,6 +28,11 @@ const PanelDiagnostico = lazy(() =>
     default: m.PanelDiagnostico,
   }))
 );
+const PaginaCarpetas = lazy(() =>
+  import('./components/folders/FolderBrowser').then((m) => ({
+    default: m.PaginaCarpetas,
+  }))
+);
 
 function FallbackCarga() {
   return (
@@ -133,6 +138,7 @@ export default function App() {
           <Suspense fallback={<FallbackCarga />}>
             <Routes>
               <Route path="/" element={<ListaPistas />} />
+              <Route path="/carpetas" element={<PaginaCarpetas />} />
               <Route path="/listas" element={<PaginaPlaylists />} />
               <Route path="/ajustes" element={<PaginaAjustes />} />
               <Route path="/diagnostico" element={<PanelDiagnostico />} />

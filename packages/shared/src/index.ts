@@ -16,6 +16,7 @@ export type {
   RespuestaPaginada,
   OpcionesOrdenamiento,
   FiltrosBusqueda,
+  NodoCarpeta,
 } from './types';
 
 export { ModoRepeticion } from './types';

@@ -1,5 +1,5 @@
 import { abrirBD } from './database';
-import type { Pista, ArchivoPista, FiltrosBusqueda, OpcionesOrdenamiento } from '@emepetre/shared';
+import type { Pista, ArchivoPista, FiltrosBusqueda, OpcionesOrdenamiento, NodoCarpeta } from '@emepetre/shared';
 
 /** Obtener todas las pistas */
 export async function obtenerTodasLasPistas(): Promise<Pista[]> {
@@ -153,6 +153,14 @@ export async function buscarPistas(
     pistas = pistas.filter((p) => p.anio <= filtros.anioHasta!);
   }
 
+  if (filtros.carpeta !== undefined) {
+    pistas = pistas.filter((p) => p.carpeta === filtros.carpeta);
+  }
+
+  if (filtros.carpetaRaiz) {
+    pistas = pistas.filter((p) => p.carpetaRaiz === filtros.carpetaRaiz);
+  }
+
   // Aplicar ordenamiento
   if (ordenamiento) {
     const { campo, direccion } = ordenamiento;
@@ -196,4 +204,84 @@ export async function obtenerAlbumes(): Promise<string[]> {
   const pistas = await db.getAll('pistas');
   const albumes = new Set(pistas.map((p) => p.album).filter(Boolean));
   return Array.from(albumes).sort();
+}
+
+/** Obtener carpetas raíz únicas */
+export async function obtenerCarpetasRaiz(): Promise<string[]> {
+  const db = await abrirBD();
+  const pistas = await db.getAll('pistas');
+  const carpetas = new Set(pistas.map((p) => p.carpetaRaiz).filter(Boolean) as string[]);
+  return Array.from(carpetas).sort();
+}
+
+/** Obtener estructura de carpetas de una carpeta raíz */
+export async function obtenerEstructuraCarpetas(carpetaRaiz: string): Promise<NodoCarpeta> {
+  const db = await abrirBD();
+  const pistas = await db.getAll('pistas');
+  const pistasDeCarpeta = pistas.filter((p) => p.carpetaRaiz === carpetaRaiz);
+
+  const raiz: NodoCarpeta = {
+    nombre: carpetaRaiz,
+    ruta: '',
+    subcarpetas: [],
+    cantidadPistas: 0,
+  };
+
+  // Contar pistas en la raíz (sin subcarpeta)
+  raiz.cantidadPistas = pistasDeCarpeta.filter((p) => !p.carpeta || p.carpeta === '').length;
+
+  // Agrupar por carpeta
+  const carpetasMap = new Map<string, number>();
+  for (const pista of pistasDeCarpeta) {
+    if (pista.carpeta) {
+      carpetasMap.set(pista.carpeta, (carpetasMap.get(pista.carpeta) || 0) + 1);
+    }
+  }
+
+  // Construir árbol
+  for (const [rutaCarpeta, cantidad] of carpetasMap) {
+    const partes = rutaCarpeta.split('/');
+    let nodoActual = raiz;
+
+    for (let i = 0; i < partes.length; i++) {
+      const parte = partes[i];
+      const rutaParcial = partes.slice(0, i + 1).join('/');
+      let subNodo = nodoActual.subcarpetas.find((s: NodoCarpeta) => s.nombre === parte);
+
+      if (!subNodo) {
+        subNodo = {
+          nombre: parte,
+          ruta: rutaParcial,
+          subcarpetas: [],
+          cantidadPistas: 0,
+        };
+        nodoActual.subcarpetas.push(subNodo);
+      }
+
+      // Solo asignar la cantidad al nodo hoja
+      if (i === partes.length - 1) {
+        subNodo.cantidadPistas = cantidad;
+      }
+
+      nodoActual = subNodo;
+    }
+  }
+
+  // Ordenar subcarpetas recursivamente
+  function ordenarSubcarpetas(nodo: NodoCarpeta) {
+    nodo.subcarpetas.sort((a: NodoCarpeta, b: NodoCarpeta) => a.nombre.localeCompare(b.nombre));
+    nodo.subcarpetas.forEach(ordenarSubcarpetas);
+  }
+  ordenarSubcarpetas(raiz);
+
+  return raiz;
+}
+
+/** Obtener pistas por carpeta */
+export async function obtenerPistasPorCarpeta(carpetaRaiz: string, carpeta?: string): Promise<Pista[]> {
+  const db = await abrirBD();
+  const pistas = await db.getAll('pistas');
+  return pistas
+    .filter((p) => p.carpetaRaiz === carpetaRaiz && (carpeta === undefined ? true : (p.carpeta || '') === carpeta))
+    .sort((a, b) => (a.nombreArchivo || '').localeCompare(b.nombreArchivo || ''));
 }

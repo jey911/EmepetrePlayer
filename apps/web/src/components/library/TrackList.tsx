@@ -4,8 +4,16 @@ import { obtenerTodasLasPistas, buscarPistas } from '../../db';
 import { PistaItem } from './TrackItem';
 import { EstadoVacio, SkeletonLoader } from '../common/index';
 import { IconoMusica, IconoBuscar, IconoImportar } from '../common/Icons';
+import { IconoCarpetaEscanear } from '../common/Icons';
 import { useUIStore } from '../../store/uiStore';
 import { abrirSelectorArchivos, importarArchivos } from '../../services/fileImporter';
+import {
+  seleccionarCarpeta,
+  seleccionarCarpetaFallback,
+  importarCarpeta,
+  importarCarpetaFallback,
+  soportaFileSystemAccess,
+} from '../../services/folderScanner';
 import { debounce } from '../../utils';
 
 export function ListaPistas() {
@@ -94,6 +102,70 @@ export function ListaPistas() {
     [],
   );
 
+  // Escanear carpeta
+  const manejarEscanearCarpeta = useCallback(async () => {
+    setImportando(true);
+    setProgreso({ actual: 0, total: 0 });
+
+    try {
+      let resultado;
+
+      if (soportaFileSystemAccess()) {
+        const dirHandle = await seleccionarCarpeta();
+        if (!dirHandle) {
+          setImportando(false);
+          return;
+        }
+        resultado = await importarCarpeta(dirHandle, (p) => {
+          if (p.fase === 'importando') {
+            setProgreso({ actual: p.actual, total: p.total });
+          }
+        });
+      } else {
+        const seleccion = await seleccionarCarpetaFallback();
+        if (!seleccion) {
+          setImportando(false);
+          return;
+        }
+        resultado = await importarCarpetaFallback(seleccion.archivos, seleccion.nombre, (p) => {
+          if (p.fase === 'importando') {
+            setProgreso({ actual: p.actual, total: p.total });
+          }
+        });
+      }
+
+      if (resultado.total === 0) {
+        agregarNotificacion('advertencia', 'No se encontraron archivos de audio en la carpeta');
+      } else {
+        if (resultado.exitosas.length > 0) {
+          agregarNotificacion(
+            'exito',
+            `${resultado.exitosas.length} pista(s) importada(s) desde "${resultado.carpetaRaiz}"`,
+          );
+        }
+        if (resultado.duplicadas.length > 0) {
+          agregarNotificacion(
+            'advertencia',
+            `${resultado.duplicadas.length} archivo(s) duplicado(s) omitido(s)`,
+          );
+        }
+        if (resultado.fallidas.length > 0) {
+          agregarNotificacion(
+            'error',
+            `${resultado.fallidas.length} archivo(s) no pudieron importarse`,
+          );
+        }
+      }
+
+      await cargarPistas();
+    } catch (error) {
+      console.error('[Biblioteca] Error al escanear carpeta:', error);
+      agregarNotificacion('error', 'Error al escanear la carpeta');
+    } finally {
+      setImportando(false);
+    }
+  }, [agregarNotificacion, cargarPistas]);
+
   const generos = useMemo(() => {
     const set = new Set(pistas.map((p) => p.genero).filter(Boolean));
     return Array.from(set).sort();
@@ -171,17 +243,30 @@ export function ListaPistas() {
           </select>
         </div>
 
-        <button
-          onClick={manejarImportar}
-          disabled={importando}
-          className="btn-primary"
-          aria-label="Importar archivos de audio"
-        >
-          <IconoImportar className="w-4 h-4" />
-          {importando
-            ? `Importando ${progreso.actual}/${progreso.total}...`
-            : 'Importar'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={manejarEscanearCarpeta}
+            disabled={importando}
+            className="btn-primary"
+            aria-label="Escanear carpeta de audio"
+            title="Escanear una carpeta completa"
+          >
+            <IconoCarpetaEscanear className="w-4 h-4" />
+            <span className="hidden sm:inline">Carpeta</span>
+          </button>
+
+          <button
+            onClick={manejarImportar}
+            disabled={importando}
+            className="btn-primary"
+            aria-label="Importar archivos de audio"
+          >
+            <IconoImportar className="w-4 h-4" />
+            {importando
+              ? `Importando ${progreso.actual}/${progreso.total}...`
+              : 'Importar'}
+          </button>
+        </div>
       </div>
 
       {/* Contador */}

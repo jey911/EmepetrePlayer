@@ -16,6 +16,9 @@ export {
   obtenerGeneros,
   obtenerArtistas,
   obtenerAlbumes,
+  obtenerCarpetasRaiz,
+  obtenerEstructuraCarpetas,
+  obtenerPistasPorCarpeta,
 } from './tracks';
 export {
   obtenerTodasLasListas,

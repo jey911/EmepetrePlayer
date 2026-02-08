@@ -7,12 +7,14 @@ import {
   IconoDiagnostico,
   IconoCerrar,
   IconoMusica,
+  IconoCarpeta,
 } from '../common/Icons';
 import { useUIStore } from '../../store/uiStore';
 import { NOMBRE_APP } from '@emepetre/shared';
 
 const enlacesNav = [
   { ruta: '/', etiqueta: 'Biblioteca', icono: IconoBiblioteca },
+  { ruta: '/carpetas', etiqueta: 'Carpetas', icono: IconoCarpeta },
   { ruta: '/listas', etiqueta: 'Playlists', icono: IconoLista },
   { ruta: '/ajustes', etiqueta: 'Ajustes', icono: IconoAjustes },
   { ruta: '/diagnostico', etiqueta: 'Diagnóstico', icono: IconoDiagnostico },
