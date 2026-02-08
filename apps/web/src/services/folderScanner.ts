@@ -2,7 +2,8 @@ import { parseBlob } from 'music-metadata-browser';
 import type { Pista, ArchivoPista } from '@emepetre/shared';
 import { TAMANO_MAXIMO_ARCHIVO } from '@emepetre/shared';
 import { generarId, uint8ArrayABase64 } from '../utils';
-import { existeDuplicado, guardarPista, guardarArchivo } from '../db';
+import { guardarPista, guardarArchivo } from '../db';
+import { abrirBD } from '../db';
 
 /** Archivo encontrado durante el escaneo con su ruta relativa */
 export interface ArchivoEncontrado {
@@ -139,6 +140,14 @@ export async function importarCarpeta(
     return resultado;
   }
 
+  // Pre-cargar lista de archivos existentes para detección de duplicados en bloque
+  // Esto evita abrir transacciones repetidas durante el bucle de importación
+  const db = await abrirBD();
+  const pistasExistentes = await db.getAll('pistas');
+  const duplicadosSet = new Set(
+    pistasExistentes.map((p) => `${p.nombreArchivo}::${p.tamanoArchivo}`),
+  );
+
   // Fase 2: Importar cada archivo encontrado
   for (let i = 0; i < archivosEncontrados.length; i++) {
     const { archivo, carpeta } = archivosEncontrados[i];
@@ -161,9 +170,9 @@ export async function importarCarpeta(
         continue;
       }
 
-      // Verificar duplicados
-      const esDuplicado = await existeDuplicado(archivo.name, archivo.size);
-      if (esDuplicado) {
+      // Verificar duplicados (usando el set en memoria, no la BD)
+      const claveDuplicado = `${archivo.name}::${archivo.size}`;
+      if (duplicadosSet.has(claveDuplicado)) {
         resultado.duplicadas.push(archivo.name);
         continue;
       }
@@ -210,9 +219,12 @@ export async function importarCarpeta(
         tipo: archivo.type || 'audio/mpeg',
       };
 
-      // Guardar en IndexedDB
-      await guardarPista(pista);
-      await guardarArchivo(archivoPista);
+      // Guardar en IndexedDB (con reintento si la conexión se cerró)
+      await guardarConReintento(() => guardarPista(pista));
+      await guardarConReintento(() => guardarArchivo(archivoPista));
+
+      // Añadir al set de duplicados para evitar re-importar en la misma sesión
+      duplicadosSet.add(claveDuplicado);
 
       resultado.exitosas.push(pista);
     } catch (error) {
@@ -226,6 +238,28 @@ export async function importarCarpeta(
   }
 
   return resultado;
+}
+
+/** Reintentar una operación de BD si la conexión se cerró */
+async function guardarConReintento<T>(operacion: () => Promise<T>, intentos = 3): Promise<T> {
+  for (let i = 0; i < intentos; i++) {
+    try {
+      return await operacion();
+    } catch (error) {
+      const esConexionCerrada =
+        error instanceof DOMException &&
+        (error.message.includes('connection is closing') ||
+         error.message.includes('connection is closed'));
+
+      if (esConexionCerrada && i < intentos - 1) {
+        // Esperar un momento y reintentar (abrirBD reabrirá la conexión)
+        await new Promise((resolve) => setTimeout(resolve, 100 * (i + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Reintentos agotados');
 }
 
 /**
@@ -294,6 +328,13 @@ export async function importarCarpetaFallback(
     return resultado;
   }
 
+  // Pre-cargar lista de archivos existentes para detección de duplicados en bloque
+  const db = await abrirBD();
+  const pistasExistentes = await db.getAll('pistas');
+  const duplicadosSet = new Set(
+    pistasExistentes.map((p) => `${p.nombreArchivo}::${p.tamanoArchivo}`),
+  );
+
   for (let i = 0; i < archivosAudio.length; i++) {
     const { archivo, carpeta } = archivosAudio[i];
 
@@ -314,8 +355,8 @@ export async function importarCarpetaFallback(
         continue;
       }
 
-      const esDuplicado = await existeDuplicado(archivo.name, archivo.size);
-      if (esDuplicado) {
+      const claveDuplicado = `${archivo.name}::${archivo.size}`;
+      if (duplicadosSet.has(claveDuplicado)) {
         resultado.duplicadas.push(archivo.name);
         continue;
       }
@@ -356,8 +397,10 @@ export async function importarCarpetaFallback(
         tipo: archivo.type || 'audio/mpeg',
       };
 
-      await guardarPista(pista);
-      await guardarArchivo(archivoPista);
+      await guardarConReintento(() => guardarPista(pista));
+      await guardarConReintento(() => guardarArchivo(archivoPista));
+
+      duplicadosSet.add(claveDuplicado);
 
       resultado.exitosas.push(pista);
     } catch (error) {

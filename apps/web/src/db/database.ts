@@ -50,11 +50,43 @@ interface EsquemaBD extends DBSchema {
 
 let dbInstancia: IDBPDatabase<EsquemaBD> | null = null;
 
+/** Verificar si la conexión a la BD sigue activa */
+function conexionActiva(db: IDBPDatabase<EsquemaBD>): boolean {
+  try {
+    // Intentar acceder a objectStoreNames para verificar que la conexión no está cerrada
+    db.objectStoreNames;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Abrir o crear la base de datos */
 export async function abrirBD(): Promise<IDBPDatabase<EsquemaBD>> {
-  if (dbInstancia) return dbInstancia;
+  if (dbInstancia && conexionActiva(dbInstancia)) return dbInstancia;
+
+  // Si la instancia existía pero la conexión se cerró, limpiarla
+  if (dbInstancia) {
+    dbInstancia = null;
+  }
 
   dbInstancia = await openDB<EsquemaBD>(NOMBRE_BD, VERSION_BD, {
+    // Cuando otro tab/proceso solicita un upgrade, cerrar esta conexión limpiamente
+    blocked() {
+      console.warn('[BD] Conexión bloqueada por otra instancia');
+    },
+    blocking() {
+      // Cerrar la conexión para permitir el upgrade de otra instancia
+      if (dbInstancia) {
+        dbInstancia.close();
+        dbInstancia = null;
+      }
+    },
+    terminated() {
+      // La conexión fue terminada inesperadamente
+      console.warn('[BD] Conexión terminada inesperadamente');
+      dbInstancia = null;
+    },
     upgrade(db) {
       // Almacén de pistas (metadatos)
       if (!db.objectStoreNames.contains('pistas')) {
@@ -99,7 +131,11 @@ export async function abrirBD(): Promise<IDBPDatabase<EsquemaBD>> {
 /** Cerrar la conexión a la base de datos */
 export function cerrarBD(): void {
   if (dbInstancia) {
-    dbInstancia.close();
+    try {
+      dbInstancia.close();
+    } catch {
+      // Ignorar errores al cerrar (puede ya estar cerrada)
+    }
     dbInstancia = null;
   }
 }
