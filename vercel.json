@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:shared && npm run build:web",
+  "buildCommand": "npm -w packages/shared run build && npm -w apps/web run build",
   "outputDirectory": "apps/web/dist",
   "installCommand": "npm install",
   "framework": null,
