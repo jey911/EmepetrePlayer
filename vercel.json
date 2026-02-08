@@ -1,7 +1,7 @@
 {
-  "buildCommand": "if [ -d apps/web ]; then cd apps/web; fi; npx tsc -b && npx vite build",
+  "buildCommand": "if [ -f package.json ] && grep -q \"\\\"workspaces\\\"\" package.json; then ROOT=. ; else ROOT=.. ; fi; cd $ROOT && npm -w apps/web run build",
   "outputDirectory": "apps/web/dist",
-  "installCommand": "npm install",
+  "installCommand": "if [ -f package.json ] && grep -q \"\\\"workspaces\\\"\" package.json; then npm install; else cd .. && npm install; fi",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
