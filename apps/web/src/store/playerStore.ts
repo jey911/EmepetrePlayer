@@ -92,23 +92,20 @@ export const usePlayerStore = create<EstadoPlayer>((set, get) => ({
         });
       }
 
+      // Limpiar todos los listeners previos antes de registrar nuevos
+      motor.offAll('finalizado');
+      motor.offAll('tiempoActualizado');
+
       set({
         pistaActual: pista,
         tiempoActual: 0,
         duracion: motor.duracion,
         cargando: false,
+        reproduciendo: false,
         historialReproduccion: [...get().historialReproduccion, pista.id],
       });
 
-      motor.reproducir();
-      set({ reproduciendo: true });
-
-      // Registrar en historial e incrementar reproducciones
-      await incrementarReproducciones(pista.id);
-      await registrarReproduccion(pista.id);
-
       // Configurar callback de finalización
-      motor.off('finalizado', get().siguiente);
       motor.on('finalizado', () => {
         const state = get();
         if (state.repeticion === ModoRepeticion.UNA) {
@@ -124,6 +121,14 @@ export const usePlayerStore = create<EstadoPlayer>((set, get) => ({
         const d = datos as { tiempoActual: number; duracion: number };
         set({ tiempoActual: d.tiempoActual, duracion: d.duracion });
       });
+
+      // Iniciar reproducción desde el principio
+      motor.reproducir();
+      set({ reproduciendo: true });
+
+      // Registrar en historial e incrementar reproducciones
+      await incrementarReproducciones(pista.id);
+      await registrarReproduccion(pista.id);
 
     } catch (error) {
       console.error('[Player] Error al cargar pista:', error);

@@ -294,6 +294,11 @@ export class MotorAudio {
     this.listeners.get(evento)?.delete(callback);
   }
 
+  /** Eliminar todos los listeners de un evento */
+  offAll(evento: EventoAudio): void {
+    this.listeners.get(evento)?.clear();
+  }
+
   private emitir(evento: EventoAudio, datos?: unknown): void {
     this.listeners.get(evento)?.forEach((callback) => {
       try {
