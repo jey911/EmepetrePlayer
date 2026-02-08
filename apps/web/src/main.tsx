@@ -2,8 +2,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
+import { Buffer } from 'buffer';
 import App from './App';
 import './index.css';
+
+// Polyfill Buffer para music-metadata-browser
+if (typeof globalThis.Buffer === 'undefined') {
+  globalThis.Buffer = Buffer;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,19 +21,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Registro del Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/',
-      });
-      console.info('[SW] Service Worker registrado:', registration.scope);
-    } catch (error) {
-      console.warn('[SW] Error al registrar Service Worker:', error);
-    }
-  });
-}
+// El registro del Service Worker lo maneja vite-plugin-pwa automáticamente
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -37,7 +31,7 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <App />
       </BrowserRouter>
     </QueryClientProvider>

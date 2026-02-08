@@ -6,6 +6,7 @@ node_modules/
 # Build
 dist/
 build/
+dev-dist/
 *.tsbuildinfo
 
 # TypeScript build output (emitted by tsc -b alongside source files)
